@@ -11,8 +11,15 @@ const sortData = (data) => {
 };
 
 // onPress of row
-const onPress = (object) => {
+const onPress = async (object, id, sequenceNO) => {
   let content = object.nextElementSibling;
+
+  if (!content.innerHTML) {
+    //fetch if there is no content
+    let tableContent = await appendCollapsed({ id, sequenceNO });
+    content.innerHTML = tableContent;
+  }
+
   if (content.style.display === "block") {
     content.style.display = "none";
   } else {
@@ -21,19 +28,21 @@ const onPress = (object) => {
 };
 
 //function to generate content of each row
-const appendCollapsed = async (data) => {
-  let response 
+const appendCollapsed = async ({ id, sequenceNO }) => {
+  let response;
   try {
-      response = await fetch(
-    `http://localhost:3000/api/book/maths/section/${data.id}`
-  );
-  response = await response.json();
+    response = await fetch(
+      `http://localhost:3000/api/book/maths/section/${id}`
+    );
+    response = await response.json();
+  } catch (error) {
+    console.log(error);
   }
 
-  catch(error){ console.log(error);}
- 
   let sortedResponse =
-    response.response[data.id] && sortData(response.response[data.id]);
+    response.response &&
+    response.response[id] &&
+    sortData(response.response[id]);
 
   let content =
     sortedResponse
@@ -43,25 +52,25 @@ const appendCollapsed = async (data) => {
         let NOT_STARTED = "grey";
 
         let status = eval(`${item.status}`);
-        return `<h4 style = "color: ${status}">${data.sequenceNO}.${item.sequenceNO} ${item.title}</h4>`;
+        return `<h4 style = "color: ${status}">${sequenceNO}.${item.sequenceNO} ${item.title}</h4>`;
       })
       .join("") ||
-    `<h4 style = "color: grey">${response.response.message}</h4>`;
+    `<h4 style = "color: grey">${
+      response.response?.message || "Data not found"
+    }</h4>`;
 
-  return `<div>${content}</div>`;
+  return `${content}`;
 };
 
 //function to generate a row.
-const fetchContentOfTable = async (data) => {
-  let content = await appendCollapsed(data);
-
+const generateRow = (data) => {
   let status = ((data.completeCount / data.childrenCount) * 100).toFixed();
 
-  status = isNaN(status) ? "" : "(" + status+ "% completed)";
+  status = isNaN(status) ? "" : "(" + status + "% completed)";
 
-  return `<button type="button" onClick= onPress(this)>
+  return `<button type="button" onClick= "onPress(this, ${data.id}, ${data.sequenceNO})">
      ${data.sequenceNO}. ${data.title}  ${status}
-    </button> ${content}`;
+    </button><div></div>`;
 };
 
 //function to generate all the rows
@@ -73,7 +82,7 @@ const generateTable = (elementToPopulate) => {
     .then(({ response }) => {
       let sortedResponse = sortData(response);
       sortedResponse.forEach((row) => {
-        promise.push(fetchContentOfTable(row));
+        promise.push(generateRow(row));
       });
 
       Promise.all(promise).then((result) => {
